@@ -3,7 +3,7 @@
 A Retrieval-Augmented Generation (RAG) pipeline for querying
 financial documents using LangChain, ChromaDB, and Groq.
 
-Built on the RBI Annual Report 2024-25 as the source document.
+Built on the RBI Annual Report 2024-25 (318 pages, 1,194 chunks at chunk_size=1000).as the source document.
 
 ## Why I Built This
 
