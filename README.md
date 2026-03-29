@@ -1,0 +1,83 @@
+# Financial Document RAG Pipeline
+
+A Retrieval-Augmented Generation (RAG) pipeline for querying
+financial documents using LangChain, ChromaDB, and Groq.
+
+Built on the RBI Annual Report 2024-25 as the source document.
+
+## Why I Built This
+
+Financial documents are dense, long, and hard to query manually.
+This pipeline chunks, embeds, and retrieves relevant sections to
+answer specific questions about financial data — the kind of
+problem every fintech AI team is solving at scale.
+
+## Tech Stack
+
+- **LangChain** — document loading and text splitting
+- **PyPDF** — PDF ingestion
+- **ChromaDB** — vector store for semantic search
+- **HuggingFace sentence-transformers** — embeddings
+- **Groq** — LLM for answer generation (in progress)
+- **Python 3.10+**
+
+## Project Status
+
+| Step                       | Status   |
+| -------------------------- | -------- |
+| PDF ingestion and chunking | ✅ Done  |
+| Embedding and vector store | 🔄 Day 2 |
+| End-to-end Q&A with Groq   | 🔄 Day 3 |
+| Failure analysis and fixes | 🔄 Day 4 |
+
+## What I Learned — Day 1
+
+- RBI 2024-25 report loads into **318 pages** and produces
+  **1194 chunks** at chunk_size=1000, overlap=200
+- `RecursiveCharacterTextSplitter` splits on paragraph
+  boundaries first before falling back to character splits —
+  this preserves more semantic meaning than fixed-size splits
+- Chunk overlap of 200 characters ensures context is not
+  lost at boundaries between chunks
+
+## Chunking Parameters
+
+```python
+chunk_size=1000      # characters per chunk
+chunk_overlap=200    # overlap between consecutive chunks
+```
+
+Chose 1000 over 500 because RBI report paragraphs are dense
+with financial terminology — smaller chunks lose context.
+Will benchmark retrieval quality at both sizes in Day 4.
+
+## How to Run
+
+```bash
+git clone https://github.com/rojitharepalle/Financial-RAG
+cd Financial-RAG
+python -m venv venv
+source venv/bin/activate
+pip install langchain langchain-community chromadb \
+  sentence-transformers groq pypdf python-dotenv
+```
+
+Add your Groq API key:
+
+```bash
+echo "GROQ_API_KEY=your_key_here" > .env
+```
+
+Run:
+
+```bash
+python load_chunks.py
+```
+
+## Roadmap
+
+- [ ] Add ChromaDB vector store
+- [ ] Add semantic search over chunks
+- [ ] Connect Groq LLM for Q&A
+- [ ] Evaluate answer quality on 10 financial questions
+- [ ] Add reranking to improve retrieval precision
