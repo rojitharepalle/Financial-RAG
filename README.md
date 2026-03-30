@@ -81,3 +81,16 @@ python load_chunks.py
 - [ ] Connect Groq LLM for Q&A
 - [ ] Evaluate answer quality on 10 financial questions
 - [ ] Add reranking to improve retrieval precision
+
+## What I Learned — Day 2:
+
+- ChromaDB stores 1,194 chunks and retrieval works
+- Result 1 failure: PDF chart text extracted as garbled axis labels, polluting the vector store with noise
+- Result 2 success: Relevant inflation projection content retrieved correctly from page 37
+- Fix planned: filter or flag chunks where meaningful word ratio is below a threshold before storing
+
+- Initial retrieval returned chart axis labels as top results
+- Root cause: PyPDF extracts graph tick marks as plain text, indistinguishable from paragraphs at chunk level
+- Fix: digit ratio filter — chunks where >30% of characters are digits or symbols are dropped before storage
+- Result: chart noise eliminated, all top 3 results now return genuine financial prose
+- Chunks after filtering: 1021 of 1,194 ( removed as noise)
