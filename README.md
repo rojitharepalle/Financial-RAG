@@ -93,4 +93,4 @@ python load_chunks.py
 - Root cause: PyPDF extracts graph tick marks as plain text, indistinguishable from paragraphs at chunk level
 - Fix: digit ratio filter — chunks where >30% of characters are digits or symbols are dropped before storage
 - Result: chart noise eliminated, all top 3 results now return genuine financial prose
-- Chunks after filtering: 1021 of 1,194 ( removed as noise)
+- Chunks after filtering: 1021 of 1,194 (173 removed as noise)
