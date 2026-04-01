@@ -1,6 +1,6 @@
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 import re
 
@@ -28,10 +28,31 @@ def is_meaningful_chunk(text, min_word_length=4, threshold=0.5):
     if len(words) < 15:
         return False
     
-    # Check digit/symbol ratio
+
+    # Filter chart x-axis patterns — month sequences
+    month_pattern = r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)-\d{1,2}\b'
+    month_matches = re.findall(month_pattern, text)
+    if len(month_matches) >= 4:
+        return False
+
+    # Check for axis label pattern — many short lines
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    short_lines = sum(1 for l in lines if re.match(r'^-?\d+\.?\d*$', l))
+    if len(lines) > 0 and short_lines / len(lines) > 0.3:
+        return False
+
+    # Calculate digit/symbol ratio
     digit_chars = sum(1 for c in text if c.isdigit() or c in '-./%')
     total_chars = len(text)
-    if digit_chars / total_chars > 0.3:
+    digit_ratio = digit_chars / total_chars
+    
+    # Calculate average word length
+    avg_word_length = sum(len(w) for w in words) / len(words)
+    
+    # Only filter if BOTH digit ratio is high AND words are short
+    # Short words + high digits = chart axis labels
+    # Long words + high digits = policy prose with numbers (keep these)
+    if digit_ratio > 0.3 and avg_word_length < 4.5:
         return False
     
     meaningful = [w for w in words if len(w) >= min_word_length 
@@ -50,15 +71,15 @@ vectorstore = Chroma.from_documents(
     embedding=embeddings,
     persist_directory=CHROMA_PATH
 )
-
+print(vectorstore._collection.count())
 print(f"Done. {len(chunks)} chunks stored in ChromaDB.")
 
-print("\nTesting retrieval...")
-query = "What is the RBI inflation target for 2024-25?"
-results = vectorstore.similarity_search(query, k=3)
+query = "What is India real GDP growth estimate for 2024-25?"
+result = vectorstore.similarity_search(query, k=5)
 
-print(f"\nTop 3 chunks for query: '{query}'")
-for i, doc in enumerate(results):
-    print(f"\n--- Result {i+1} ---")
-    print(f"Page: {doc.metadata.get('page', 'unknown')}")
-    print(doc.page_content[:300])
+print("\nRetrieved chunks:")
+for i, doc in enumerate(result):
+    print(f"\n--- Chunk {i+1} --- Page: {doc.metadata.get('page', 'unknown')}")
+    print(doc.page_content[:200])
+
+context = "\n\n".join([doc.page_content for doc in result])

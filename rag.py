@@ -3,24 +3,35 @@ from dotenv import load_dotenv
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from groq import Groq
 
 load_dotenv()
 
-# Load and chunk
-loader = PyPDFLoader("rbi_report.pdf")
-documents = loader.load()
-splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-chunks = splitter.split_documents(documents)
+CHROMA_PATH = "chroma_db"
 
-# Embed and store
+# Load existing vectorstore
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vectorstore = Chroma.from_documents(chunks, embeddings)
+vectorstore = Chroma(
+    persist_directory=CHROMA_PATH,
+    embedding_function=embeddings
+)
+
+print(f"Total chunks in store: {vectorstore._collection.count()}")
+
 
 # Query
-question = "What measures has RBI taken regarding interest rates?"
-retrieved = vectorstore.similarity_search(question, k=3)
+question = "What is the RBI's GDP growth forecast for 2024-25?"
+retrieved = vectorstore.similarity_search(question, k=5)
+
+question = "real GDP growth 6.4 per cent 2024-25 India"
+retrieved = vectorstore.similarity_search(question, k=5)
+
+print("\nRetrieved chunks:")
+for i, doc in enumerate(retrieved):
+    print(f"\n--- Chunk {i+1} --- Page: {doc.metadata.get('page', 'unknown')}")
+    print(doc.page_content[:200])
+
 context = "\n\n".join([doc.page_content for doc in retrieved])
 
 # Generate answer
