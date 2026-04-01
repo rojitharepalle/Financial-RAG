@@ -4,6 +4,20 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 import re
 
+
+def get_section(page_num):
+    """Map page numbers to RBI Annual Report sections."""
+    if page_num <= 30:
+        return "overview"
+    elif page_num <= 110:
+        return "economic_review"
+    elif page_num <= 160:
+        return "monetary_policy"
+    elif page_num <= 220:
+        return "financial_markets"
+    else:
+        return "other"
+
 PDF_PATH = "rbi_report.pdf"
 CHROMA_PATH = "chroma_db"
 
@@ -64,6 +78,13 @@ filtered_chunks = [c for c in chunks if is_meaningful_chunk(c.page_content)]
 print(f"Chunks after filtering: {len(filtered_chunks)} "
       f"(removed {len(chunks) - len(filtered_chunks)})")
 
+
+# Add section metadata to each chunk
+for chunk in filtered_chunks:
+    page = chunk.metadata.get('page', 0)
+    chunk.metadata['section'] = get_section(page)
+
+print("Sample metadata:", filtered_chunks[0].metadata)
 
 print("Storing chunks in ChromaDB...")
 vectorstore = Chroma.from_documents(

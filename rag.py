@@ -25,7 +25,7 @@ reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 # Query
 question = "What is India GDP growth forecast for 2024-25 and 2025-26?"
-retrieved = vectorstore.similarity_search(question, k=10)
+retrieved = vectorstore.similarity_search(question, k=10, filter={"section": "economic_review"})
 
 # Rerank using cross-encoder
 pairs = [[question, doc.page_content] for doc in retrieved]
@@ -47,9 +47,20 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 response = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
     messages=[
-        {"role": "system", "content": "Answer using only the context provided."},
-        {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
-    ]
+    {
+        "role": "system", 
+        "content": """Answer using ONLY the context provided. 
+    Rules:
+    1. If the answer is not explicitly in the context, say exactly: 'Not found in provided context.'
+    2. After your answer, always add: 'Source: Page [X]' citing which page your answer came from.
+    3. Never use knowledge outside the provided context.
+    4. If multiple pages contain relevant info, cite all of them."""
+    },
+    {
+        "role": "user", 
+        "content": f"Context:\n{context}\n\nQuestion: {question}"
+    }
+]
 )
 
 print("\nAnswer:")
