@@ -3,7 +3,8 @@
 A Retrieval-Augmented Generation (RAG) pipeline for querying
 financial documents using LangChain, ChromaDB, and Groq.
 
-Built on the RBI Annual Report 2024-25 (318 pages, 1,194 chunks at chunk_size=1000).as the source document.
+Built on the RBI Annual Report 2024-25 (318 pages, 1,194 chunks
+at chunk_size=1000) as the source document.
 
 ## Why I Built This
 
@@ -17,8 +18,9 @@ problem every fintech AI team is solving at scale.
 - **LangChain** — document loading and text splitting
 - **PyPDF** — PDF ingestion
 - **ChromaDB** — vector store for semantic search
-- **HuggingFace sentence-transformers** — embeddings
-- **Groq** — LLM for answer generation (llama-3.3-70-versatile)
+- **HuggingFace sentence-transformers** — embeddings (all-MiniLM-L6-v2)
+- **Cross-Encoder** — reranking (ms-marco-MiniLM-L-6-v2)
+- **Groq** — LLM for answer generation (llama-3.3-70b-versatile)
 - **Python 3.10+**
 
 ## Project Structure
@@ -68,53 +70,58 @@ chunk_size=1000      # characters per chunk
 chunk_overlap=200    # overlap between consecutive chunks
 ```
 
-Chose 1000 over 500 because RBI report paragraphs are densewith financial terminology — smaller chunks lose context.Will benchmark retrieval quality at both sizes in Day 4.
+Chose 1000 over 500 because RBI report paragraphs are dense
+with financial terminology — smaller chunks lose context.
 
 ## What I Learned — Day 1
 
-- RBI 2024-25 report loads into **318 pages** and produces **1194 chunks** at chunk_size=1000, overlap=200
-- `RecursiveCharacterTextSplitter` splits on paragraph boundaries first before falling back to character splits — this preserves more semantic meaning than fixed-size splits
-- Chunk overlap of 200 characters ensures context is not lost at boundaries between chunks
+- RBI 2024-25 report loads into **318 pages** and produces
+  **1,194 chunks** at chunk_size=1000, overlap=200
+- `RecursiveCharacterTextSplitter` splits on paragraph
+  boundaries first before falling back to character splits —
+  this preserves more semantic meaning than fixed-size splits
+- Chunk overlap of 200 characters ensures context is not
+  lost at boundaries between chunks
 
-## What I Learned — Day 2:
+## What I Learned — Day 2
 
 - ChromaDB stores 1,194 chunks and retrieval works
-- Result 1 failure: PDF chart text extracted as garbled axis labels, polluting the vector store with noise
-- Result 2 success: Relevant inflation projection content retrieved correctly from page 37
-- Fix planned: filter or flag chunks where meaningful word ratio is below a threshold before storing
-
 - Initial retrieval returned chart axis labels as top results
-- Root cause: PyPDF extracts graph tick marks as plain text, indistinguishable from paragraphs at chunk level
-- Fix: digit ratio filter — chunks where >30% of characters are digits or symbols are dropped before storage
-- Result: chart noise eliminated, all top 3 results now return genuine financial prose
-- Chunks after filtering: 1028 of 1,194 (166 removed as noise)
+- Root cause: PyPDF extracts graph tick marks as plain text,
+  indistinguishable from paragraphs at chunk level
+- Fix: digit ratio filter — chunks where >30% of characters
+  are digits or symbols are dropped before storage
+- Result: chart noise eliminated, all top 3 results now
+  return genuine financial prose
+- Chunks after filtering: 1,028 of 1,194 (166 removed as noise)
 
 ## What I Learned — Day 3
 
-- Connected ChromaDB retrieval to Groq LLM (llama-3.3-70b-versatile) for end-to-end question answering
+- Connected ChromaDB retrieval to Groq LLM end-to-end
 - Tested 3 questions against the RBI Annual Report
 
-| Question                  | Result                                                             |
-| ------------------------- | ------------------------------------------------------------------ |
-| RBI's stance on inflation | Weak — chunks retrieved from bibliography, not policy sections     |
-| GDP growth forecast       | Strong — returned 6.4% for 2024-25 and 6.7% for 2025-26 accurately |
-| Interest rate measures    | Partial — retrieved table data but missed narrative policy text    |
+| Question                  | Result                                                       |
+| ------------------------- | ------------------------------------------------------------ |
+| RBI's stance on inflation | Weak — bibliography chunks retrieved, not policy sections    |
+| GDP growth forecast       | Strong — returned 6.4% for 2024-25 and 6.7% for 2025-26      |
+| Interest rate measures    | Partial — table data retrieved, missed narrative policy text |
 
-- Pattern: larger chunks improve narrative policy retrieval but the noise filter removed chunks containing numerical forecasts, breaking GDP retrieval
+- Pattern: larger chunks improve narrative policy retrieval
+  but noise filter accidentally removed numerical forecast chunks
 
 ## What I Learned — Day 4
 
 ### Chunk Size Benchmarking — 500 vs 1000
 
-| Question                  | chunk_size=500                       | chunk_size=1000                              |
-| ------------------------- | ------------------------------------ | -------------------------------------------- |
-| RBI's stance on inflation | Weak — bibliography chunks retrieved | Weak — inferred from research topics         |
-| GDP growth forecast       | Strong — 6.4% and 6.7% returned      | Weak — IMF forecast returned instead         |
-| Interest rate measures    | Partial — table data only            | Strong — specific measures with basis points |
+| Question                  | chunk_size=500                  | chunk_size=1000                              |
+| ------------------------- | ------------------------------- | -------------------------------------------- |
+| RBI's stance on inflation | Weak — bibliography chunks      | Weak — inferred from research topics         |
+| GDP growth forecast       | Strong — 6.4% and 6.7% returned | Weak — IMF forecast returned instead         |
+| Interest rate measures    | Partial — table data only       | Strong — specific measures with basis points |
 
 ### Noise Filter Iterations
 
-- Initial filter removed 166 chunks — but was also removing
+- Initial filter removed 166 chunks but also removed
   legitimate numerical policy chunks containing GDP forecasts
 - Refined filter with 3 conditions:
   - Month sequence pattern (Jan-21, Feb-21 etc.) → filter
@@ -124,25 +131,32 @@ Chose 1000 over 500 because RBI report paragraphs are densewith financial termin
 
 ### Critical Finding — Silent Hallucination
 
-- When retrieved chunks don't contain the answer, `llama-3.3-70b-versatile` pulls numbers from training data instead of saying "not found"
-- Example: Asked for India GDP forecast, returned 7.1% confidently — number not present in any retrieved chunk
-- This is the most dangerous failure mode in production RAG — the system sounds confident while being wrong
-- Fix: add a confidence check or force the LLM to cite the specific chunk it used
+- When retrieved chunks don't contain the answer,
+  `llama-3.3-70b-versatile` pulls numbers from training
+  data instead of saying "not found"
+- Example: Asked for India GDP forecast, returned 7.1%
+  confidently — number not present in any retrieved chunk
+- This is the most dangerous failure mode in production RAG
+  — the system sounds confident while being wrong
+- Fix: force LLM to cite the specific chunk and page used
 
 ### Retrieval Failure — Deep Document Chunks
 
-- Page 114 contains the exact GDP forecast (6.4% for 2024-25, 6.7% for 2025-26) but is never retrieved regardless of question wording
-- Root cause: `all-MiniLM-L6-v2` embedding model does not capture semantic similarity between forecast questions and forecast prose buried deep in the document
-- Fix planned for Day 5: add reranking using a cross-encoder model to reorder top-k results by true relevance
+- Specific forecast chunks buried deep in document were
+  never retrieved regardless of question wording
+- Root cause: `all-MiniLM-L6-v2` does not capture semantic
+  similarity between forecast questions and forecast prose
+  at depth
+- Fix: reranking with cross-encoder model
 
 ## What I Learned — Day 5
 
 ### Reranking with Cross-Encoder
 
 - Added `cross-encoder/ms-marco-MiniLM-L-6-v2` reranker
-- Pipeline now retrieves k=10 candidates, reranks by true relevance, passes top 3 to LLM
+- Pipeline now retrieves k=10 candidates, reranks by true
+  relevance, passes top 3 to LLM
 - Reranking improved answer quality for policy questions
-- System prompt updated to return "Not found in document" instead of hallucinating
 
 ### Critical Finding — Semantic Ambiguity
 
@@ -153,17 +167,54 @@ Chose 1000 over 500 because RBI report paragraphs are densewith financial termin
   - Export growth (page 98)
   - G-sec holdings (page 176)
 - Embedding model cannot distinguish between these contexts
-- A question about "GDP growth forecast" retrieves whichever 6.4% chunk has highest cosine similarity — not necessarily the correct one
-- This is a fundamental limitation of dense retrieval for numerical data in financial documents
-- Fix: metadata filtering — tag chunks by section/chapter so GDP questions only search economic outlook sections
+- A question about "GDP growth forecast" retrieves whichever
+  6.4% chunk has highest cosine similarity — not the correct one
+- This is a fundamental limitation of dense retrieval for
+  numerical data in financial documents
+- Fix: metadata filtering by document section
 
-  ## Roadmap
+## What I Learned — Day 6
+
+### Metadata Section Filtering
+
+- Tagged all 1,028 chunks with document section metadata:
+  - Pages 1-30 → overview
+  - Pages 31-110 → economic_review
+  - Pages 111-160 → monetary_policy
+  - Pages 161-220 → financial_markets
+  - Pages 221+ → other
+- GDP questions now filter to economic_review section only
+- Eliminates cross-section pollution where same number
+  means different things in different chapters
+
+### Hallucination Detection
+
+- Updated system prompt with strict rules:
+  - Answer only from provided context
+  - Return "Not found in provided context" if answer absent
+  - Always cite source page number
+- Before: returned 7.1% GDP confidently from training data
+- After: returns "Not found in provided context. Source: Page 78"
+- Production-grade behaviour — traceable, honest, safe
+
+### Why This Matters In Fintech
+
+- A wrong number stated confidently in a financial system
+  is not an inconvenience — it is a compliance risk
+- Silent hallucination + semantic ambiguity + no source
+  citation = untrusted AI in regulated environments
+- Every fix in this pipeline addresses a real production
+  failure mode, not a tutorial edge case
+
+## Roadmap
 
 - [x] PDF ingestion and chunking
 - [x] Embedding and vector store with ChromaDB
 - [x] End-to-end Q&A with Groq LLM
 - [x] Noise filter for chart extraction artifacts
 - [x] Chunk size benchmarking — 500 vs 1000
-- [ ] Reranking with cross-encoder model
-- [ ] Hallucination detection — force LLM to cite source chunk
+- [x] Reranking with cross-encoder model
+- [x] Metadata section filtering
+- [x] Hallucination detection with source citation
 - [ ] Evaluation scoring across 10 standard questions
+- [ ] Streamlit demo interface
