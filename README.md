@@ -18,7 +18,7 @@ problem every fintech AI team is solving at scale.
 - **PyPDF** — PDF ingestion
 - **ChromaDB** — vector store for semantic search
 - **HuggingFace sentence-transformers** — embeddings
-- **Groq** — LLM for answer generation (in progress)
+- **Groq** — LLM for answer generation (llama-3.3-70-versatile)
 - **Python 3.10+**
 
 ## Project Structure
@@ -68,23 +68,13 @@ chunk_size=1000      # characters per chunk
 chunk_overlap=200    # overlap between consecutive chunks
 ```
 
-Chose 1000 over 500 because RBI report paragraphs are dense
-with financial terminology — smaller chunks lose context.
+Chose 1000 over 500 because RBI report paragraphs are densewith financial terminology — smaller chunks lose context.Will benchmark retrieval quality at both sizes in Day 4.
 
 ## What I Learned — Day 1
 
 - RBI 2024-25 report loads into **318 pages** and produces **1194 chunks** at chunk_size=1000, overlap=200
 - `RecursiveCharacterTextSplitter` splits on paragraph boundaries first before falling back to character splits — this preserves more semantic meaning than fixed-size splits
 - Chunk overlap of 200 characters ensures context is not lost at boundaries between chunks
-
-## Chunking Parameters
-
-```python
-chunk_size=1000      # characters per chunk
-chunk_overlap=200    # overlap between consecutive chunks
-```
-
-Chose 1000 over 500 because RBI report paragraphs are dense with financial terminology — smaller chunks lose context.Will benchmark retrieval quality at both sizes in Day 4.
 
 ## What I Learned — Day 2:
 
@@ -97,7 +87,7 @@ Chose 1000 over 500 because RBI report paragraphs are dense with financial termi
 - Root cause: PyPDF extracts graph tick marks as plain text, indistinguishable from paragraphs at chunk level
 - Fix: digit ratio filter — chunks where >30% of characters are digits or symbols are dropped before storage
 - Result: chart noise eliminated, all top 3 results now return genuine financial prose
-- Chunks after filtering: 1021 of 1,194 (173 removed as noise)
+- Chunks after filtering: 1028 of 1,194 (166 removed as noise)
 
 ## What I Learned — Day 3
 
@@ -114,33 +104,44 @@ Chose 1000 over 500 because RBI report paragraphs are dense with financial termi
 
 ## What I Learned — Day 4
 
-- Identified a critical tradeoff in the noise filter
-- The digit ratio filter successfully removes chart axis
-  labels but also removes legitimate numerical policy data
-  such as GDP forecasts and inflation projections
-- Root cause: the filter cannot distinguish between
-  meaningless digit noise (chart labels) and meaningful
-  numerical data (policy forecasts)
-- Fix planned: refine filter to check digit ratio AND
-  average word length — axis labels have short words,
-  policy prose with numbers has longer surrounding words
+### Chunk Size Benchmarking — 500 vs 1000
 
-## What Breaks
+| Question                  | chunk_size=500                       | chunk_size=1000                              |
+| ------------------------- | ------------------------------------ | -------------------------------------------- |
+| RBI's stance on inflation | Weak — bibliography chunks retrieved | Weak — inferred from research topics         |
+| GDP growth forecast       | Strong — 6.4% and 6.7% returned      | Weak — IMF forecast returned instead         |
+| Interest rate measures    | Partial — table data only            | Strong — specific measures with basis points |
 
-- Noise filter over-aggressively removes chunks with
-  legitimate numerical forecasts
-- Inflation stance question retrieves research bibliography
-  instead of actual policy sections — chunking splits
-  across policy paragraphs
-- Fix in progress: smarter noise filter + reranking
+### Noise Filter Iterations
 
-## Roadmap
+- Initial filter removed 166 chunks — but was also removing
+  legitimate numerical policy chunks containing GDP forecasts
+- Refined filter with 3 conditions:
+  - Month sequence pattern (Jan-21, Feb-21 etc.) → filter
+  - Lines with standalone numbers ratio > 30% → filter
+  - High digit ratio AND short average word length → filter
+- Final result: 1,028 clean chunks from 1,194 total
+
+### Critical Finding — Silent Hallucination
+
+- When retrieved chunks don't contain the answer, `llama-3.3-70b-versatile` pulls numbers from training data instead of saying "not found"
+- Example: Asked for India GDP forecast, returned 7.1% confidently — number not present in any retrieved chunk
+- This is the most dangerous failure mode in production RAG — the system sounds confident while being wrong
+- Fix: add a confidence check or force the LLM to cite the specific chunk it used
+
+### Retrieval Failure — Deep Document Chunks
+
+- Page 114 contains the exact GDP forecast (6.4% for 2024-25, 6.7% for 2025-26) but is never retrieved regardless of question wording
+- Root cause: `all-MiniLM-L6-v2` embedding model does not capture semantic similarity between forecast questions and forecast prose buried deep in the document
+- Fix planned for Day 5: add reranking using a cross-encoder model to reorder top-k results by true relevance
+
+  ## Roadmap
 
 - [x] PDF ingestion and chunking
 - [x] Embedding and vector store with ChromaDB
 - [x] End-to-end Q&A with Groq LLM
 - [x] Noise filter for chart extraction artifacts
 - [x] Chunk size benchmarking — 500 vs 1000
-- [ ] Refined noise filter preserving numerical policy data
-- [ ] Reranking to improve retrieval precision
+- [ ] Reranking with cross-encoder model
+- [ ] Hallucination detection — force LLM to cite source chunk
 - [ ] Evaluation scoring across 10 standard questions
