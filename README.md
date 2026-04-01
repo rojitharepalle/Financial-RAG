@@ -135,6 +135,28 @@ Chose 1000 over 500 because RBI report paragraphs are densewith financial termin
 - Root cause: `all-MiniLM-L6-v2` embedding model does not capture semantic similarity between forecast questions and forecast prose buried deep in the document
 - Fix planned for Day 5: add reranking using a cross-encoder model to reorder top-k results by true relevance
 
+## What I Learned — Day 5
+
+### Reranking with Cross-Encoder
+
+- Added `cross-encoder/ms-marco-MiniLM-L-6-v2` reranker
+- Pipeline now retrieves k=10 candidates, reranks by true relevance, passes top 3 to LLM
+- Reranking improved answer quality for policy questions
+- System prompt updated to return "Not found in document" instead of hallucinating
+
+### Critical Finding — Semantic Ambiguity
+
+- The number 6.4% appears in 4 different chunks meaning
+  completely different things:
+  - GVA growth (page 46)
+  - Electricity price inflation (page 62)
+  - Export growth (page 98)
+  - G-sec holdings (page 176)
+- Embedding model cannot distinguish between these contexts
+- A question about "GDP growth forecast" retrieves whichever 6.4% chunk has highest cosine similarity — not necessarily the correct one
+- This is a fundamental limitation of dense retrieval for numerical data in financial documents
+- Fix: metadata filtering — tag chunks by section/chapter so GDP questions only search economic outlook sections
+
   ## Roadmap
 
 - [x] PDF ingestion and chunking
