@@ -94,3 +94,19 @@ python load_chunks.py
 - Fix: digit ratio filter — chunks where >30% of characters are digits or symbols are dropped before storage
 - Result: chart noise eliminated, all top 3 results now return genuine financial prose
 - Chunks after filtering: 1021 of 1,194 (173 removed as noise)
+
+## What I Learned — Day 3
+
+- Connected ChromaDB retrieval to Groq LLM (llama-3.3-70b-versatile)
+  for end-to-end question answering
+- Tested 3 questions against the RBI Annual Report
+
+| Question                  | Result                                                             |
+| ------------------------- | ------------------------------------------------------------------ |
+| RBI's stance on inflation | Weak — chunks retrieved from bibliography, not policy sections     |
+| GDP growth forecast       | Strong — returned 6.4% for 2024-25 and 6.7% for 2025-26 accurately |
+| Interest rate measures    | Partial — retrieved table data but missed narrative policy text    |
+
+- Pattern identified: pipeline handles tabular data well, struggles when answers live in narrative prose that spans multiple chunks
+- Root cause hypothesis: chunks are splitting mid-paragraph in dense policy sections, breaking the context needed to answer qualitative questions
+- Day 4 fix: benchmark chunk_size=500 vs 1000 on the same questions and measure answer quality difference
