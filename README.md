@@ -1,4 +1,5 @@
 # Financial Document RAG Pipeline
+<img width="1902" height="965" alt="image" src="https://github.com/user-attachments/assets/c43717a6-0543-410d-b064-c1ad413bc765" />
 
 A Retrieval-Augmented Generation (RAG) pipeline for querying
 financial documents using LangChain, ChromaDB, and Groq.
