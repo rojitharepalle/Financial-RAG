@@ -13,7 +13,7 @@ This pipeline chunks, embeds, and retrieves relevant sections to
 answer specific questions about financial data — the kind of
 problem every fintech AI team is solving at scale.
 
-##Demo
+## Demo
 
 <img width="1902" height="965" alt="image" src="https://github.com/user-attachments/assets/ac285d53-d3b5-4cc5-8205-3a037bb483a4" />
 
