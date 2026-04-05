@@ -1,7 +1,5 @@
 import os
 from dotenv import load_dotenv
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
 from groq import Groq
@@ -10,7 +8,7 @@ from sentence_transformers import CrossEncoder
 load_dotenv()
 
 CHROMA_PATH = "chroma_db"
-
+print("Starting evaluation...")
 # Load existing vectorstore
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vectorstore = Chroma(
@@ -23,53 +21,59 @@ print(f"Total chunks in store: {vectorstore._collection.count()}")
 # Load cross-encoder for reranking
 reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
 
-# Query
-question = "What is India GDP growth forecast for 2024-25 and 2025-26?"
-retrieved = vectorstore.similarity_search(question, k=10, filter={"section": "economic_review"})
-
-# Rerank using cross-encoder
-pairs = [[question, doc.page_content] for doc in retrieved]
-scores = reranker.predict(pairs)
-
-# Sort by score descending
-ranked = sorted(zip(scores, retrieved), key=lambda x: x[0], reverse=True)
-top3 = [doc for score, doc in ranked[:3]]
-
-print("\nReranked top 3 chunks:")
-for i, doc in enumerate(top3):
-    print(f"\n--- Chunk {i+1} --- Page: {doc.metadata.get('page', 'unknown')}")
-    print(doc.page_content[:200])
-
-context = "\n\n".join([doc.page_content for doc in top3])
-
-# Generate answer
+# Groq client
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-response = client.chat.completions.create(
-    model="llama-3.3-70b-versatile",
-    messages=[
-    {
-        "role": "system", 
-        "content": """Answer using ONLY the context provided. 
-    Rules:
-    1. If the answer is not explicitly in the context, say exactly: 'Not found in provided context.'
-    2. After your answer, always add: 'Source: Page [X]' citing which page your answer came from.
-    3. Never use knowledge outside the provided context.
-    4. If multiple pages contain relevant info, cite all of them."""
-    },
-    {
-        "role": "user", 
-        "content": f"Context:\n{context}\n\nQuestion: {question}"
-    }
+
+# 10 evaluation questions
+questions = [
+    "What is India's real GDP growth rate for 2024-25?",
+    "What is the RBI repo rate as of March 2025?",
+    "What is the CPI inflation projection for 2025-26?",
+    "What is India's fiscal deficit target for 2025-26?",
+    "What is the foreign exchange reserve level as of March 2025?",
+    "What is the growth rate of bank credit in 2024-25?",
+    "What is the unemployment rate in India for 2024-25?",
+    "What measures did RBI take regarding liquidity in 2024-25?",
+    "What is India's current account deficit for 2024-25?",
+    "What is the RBI's inflation target band?"
 ]
-)
 
-print("\nAnswer:")
-print(response.choices[0].message.content)
+for i, question in enumerate(questions):
+    # Retrieve
+    retrieved = vectorstore.similarity_search(
+        question,
+        k=10,
+        filter={"section": "economic_review"}
+    )
 
-all_chunks = vectorstore.get()
-for i, doc in enumerate(all_chunks['documents']):
-    if "6.4 per cent" in doc and "2024-25" in doc:
-        metadata = all_chunks['metadatas'][i]
-        print(f"\nFound on page: {metadata.get('page')}")
-        print(doc[:500])
-        print("---")
+    # Rerank
+    pairs = [[question, doc.page_content] for doc in retrieved]
+    scores = reranker.predict(pairs)
+    ranked = sorted(zip(scores, retrieved), key=lambda x: x[0], reverse=True)
+    top3 = [doc for score, doc in ranked[:3]]
+
+    context = "\n\n".join([doc.page_content for doc in top3])
+
+    # Generate answer
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": """Answer using ONLY the context provided.
+Rules:
+1. If the answer is not explicitly in the context, say exactly: 'Not found in provided context.'
+2. After your answer, always add: 'Source: Page [X]' citing which page your answer came from.
+3. Never use knowledge outside the provided context.
+4. If multiple pages contain relevant info, cite all of them."""
+            },
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {question}"
+            }
+        ]
+    )
+
+    print(f"\nQ{i+1}: {question}")
+    print(f"A: {response.choices[0].message.content}")
+    print("-" * 50)

@@ -27,9 +27,10 @@ problem every fintech AI team is solving at scale.
 
 ```
 financial-rag/
-├── embed_store.py   # builds ChromaDB once from PDF
-├── rag.py           # queries ChromaDB and generates answers
-├── .env             # GROQ_API_KEY (not committed)
+├── embed_store.py    # builds ChromaDB once from PDF
+├── rag.py            # queries ChromaDB and generates answers
+├── evaluate.py       # runs 10 standard questions, saves CSV
+├── .env              # GROQ_API_KEY (not committed)
 └── README.md
 ```
 
@@ -61,6 +62,12 @@ Query the document:
 
 ```bash
 python rag.py
+```
+
+Run evaluation:
+
+```bash
+python evaluate.py
 ```
 
 ## Chunking Parameters
@@ -206,6 +213,35 @@ with financial terminology — smaller chunks lose context.
 - Every fix in this pipeline addresses a real production
   failure mode, not a tutorial edge case
 
+## What I Learned — Day 10
+
+### Evaluation Scoring
+
+- Built automated evaluation script across 10 standard
+  financial questions with known expected answers
+- Final score: 9/10 correct
+- Results saved to timestamped CSV for repeatability
+
+| Question                             | Score                                        |
+| ------------------------------------ | -------------------------------------------- |
+| India real GDP growth rate 2024-25   | Correct — 6.5%                               |
+| RBI repo rate March 2025             | Correct — 6.0%                               |
+| CPI inflation projection 2025-26     | Correct — 4.0%                               |
+| Fiscal deficit target 2025-26        | Correct                                      |
+| Foreign exchange reserves March 2025 | Correct — 11 months import cover             |
+| Bank credit growth 2024-25           | Correct — 11.8%                              |
+| Unemployment rate 2024-25            | Correct — not in document, answered honestly |
+| Liquidity measures 2024-25           | Wrong — vague context retrieved              |
+| Current account deficit 2024-25      | Correct — not in document, answered honestly |
+| RBI inflation target band            | Correct                                      |
+
+- Scoring logic: keyword matching against expected answers
+- "Not found in provided context" treated as correct when
+  document genuinely lacks the information
+- Only failure: liquidity measures — section filter too
+  restrictive, relevant chunks in monetary_policy section
+  not searched
+
 ## Roadmap
 
 - [x] PDF ingestion and chunking
@@ -216,5 +252,5 @@ with financial terminology — smaller chunks lose context.
 - [x] Reranking with cross-encoder model
 - [x] Metadata section filtering
 - [x] Hallucination detection with source citation
-- [ ] Evaluation scoring across 10 standard questions
+- [x] Evaluation scoring — 9/10 on 10 standard questions
 - [ ] Streamlit demo interface
