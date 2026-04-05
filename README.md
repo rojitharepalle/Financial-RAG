@@ -253,4 +253,4 @@ with financial terminology — smaller chunks lose context.
 - [x] Metadata section filtering
 - [x] Hallucination detection with source citation
 - [x] Evaluation scoring — 9/10 on 10 standard questions
-- [ ] Streamlit demo interface
+- [x] Streamlit demo interface
