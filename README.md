@@ -1,5 +1,7 @@
 # Financial Document RAG Pipeline
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face-yellow)](https://huggingface.co/spaces/rojitharepalle/financial-rag-demo)
+
 A Retrieval-Augmented Generation (RAG) pipeline for querying
 financial documents using LangChain, ChromaDB, and Groq.
 
