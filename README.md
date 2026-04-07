@@ -17,7 +17,8 @@ problem every fintech AI team is solving at scale.
 
 ## Demo
 
-![alt text](image.png)
+<img width="1914" height="966" alt="image" src="https://github.com/user-attachments/assets/b066fce4-444c-47f9-a360-ee2fdd3c8afa" />
+
 
 Ask questions about the RBI Annual Report 2024-25 and get
 answers grounded in the actual document with source citations.
