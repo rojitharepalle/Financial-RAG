@@ -1,5 +1,7 @@
 # Financial Document RAG Pipeline
 
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-Hugging%20Face-yellow)](https://huggingface.co/spaces/rojitharepalle/financial-rag-demo)
+
 A Retrieval-Augmented Generation (RAG) pipeline for querying
 financial documents using LangChain, ChromaDB, and Groq.
 
@@ -12,6 +14,14 @@ Financial documents are dense, long, and hard to query manually.
 This pipeline chunks, embeds, and retrieves relevant sections to
 answer specific questions about financial data — the kind of
 problem every fintech AI team is solving at scale.
+
+## Demo
+
+<img width="1902" height="965" alt="image" src="https://github.com/user-attachments/assets/ac285d53-d3b5-4cc5-8205-3a037bb483a4" />
+
+Ask questions about the RBI Annual Report 2024-25 and get 
+answers grounded in the actual document with source citations.
+
 
 ## Tech Stack
 
